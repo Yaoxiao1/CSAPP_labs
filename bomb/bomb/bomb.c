@@ -1,7 +1,7 @@
 /***************************************************************************
  * Dr. Evil's Insidious Bomb, Version 1.1
  * Copyright 2011, Dr. Evil Incorporated. All rights reserved.
- * 
+ *
  * LICENSE:
  *
  * Dr. Evil Incorporated (the PERPETRATOR) hereby grants you (the
