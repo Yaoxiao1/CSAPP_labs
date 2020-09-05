@@ -3,6 +3,8 @@ The CS:APP Data Lab
 Directions to Students
 ***********************
 
+[中文版](https://github.com/Yaoxiao1/CSAPP_labs/blob/master/datalab-handout/README_ch.md)
+
 Your goal is to modify your copy of bits.c so that it passes all the
 tests in btest without violating any of the coding guidelines.
 
