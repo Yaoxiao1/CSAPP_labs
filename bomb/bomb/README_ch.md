@@ -7,6 +7,7 @@
 - [BombLab phase_4](#bomblab-phase_4)
 - [Bomblab Phase_5](#bomblab-phase_5)
 - [Bomblab phase_6](#bomblab-phase_6)
+- [Bomblab secret_phase](#bomblab-secret_phase)
 
 ## 常用指令
 ```
@@ -554,7 +555,7 @@ do{
     if(y==0x18) break;
 } while(true);
 // ---------------------------------------------------------
-// part3, from 0x6032d0 there is a linked list, so we need to print out the value of each node to next part
+// part3, from 0x6032d0 there is an array, so we need to print out the value of each node to next part
 b = *(p+0x20);  // 0x4011ab
 a = p+0x28;
 y = p+0x50;
@@ -582,8 +583,169 @@ return;
 ```
 这个phase的代码特别长, 所以要分而治之, 从伪代码来看, 我把它分成了5个部分, 第一个部分从`0x401100`到`0x401151`, 这个部分它首先检查是否输入了6个数, 然后检查每个数都不相等;
 第二部分把每个数求对7的补来替代(也就是num = 7 -num);
-第三部分涉及到一个链表, 起点从`0x6030f0`,对应的值为36, +8之后表示它的next指针指向的位置(为`0x603110`, 对应的值为8), 因此我们需要把整个链表的值都打印出来, 从`0x6030f0`到`0x603210`差不多有12个数, 然后根据part3里分支的选择方法,根据%rcx的值决定把哪个节点的值存到%rsp+0x20上面,这个在part4里完成,在part5里对这些数字进一步处理;
+第三部分涉及到一个数组, 数组从`0x6032d0`开始,储存6个数,依次是`0x14c, 0xa8, 0x39c, 0x2b3, 0x1dd, 0x1bb`, 排列顺序从大到小是`3>4>5>6>1>2`然后根据part3里分支的选择方法,根据%rcx的值决定把哪个节点的值存到%rsp+0x20上面,这个在part4里完成,在part5里对这些数字进一步处理;
 part5就是把刚刚存在%rsp+0x20的数字一个个提取出来, 判断他们是降序排列的, 因此我们可以根据这个要求反推出在part3里我们的数据应该如何排列, 最终的结果是`4 3 2 1 6 5`;
 
-
+## Bomblab secret_phase
+正常情况下, 回答完6个phase之后会直接结束本实验, 但是我们在看汇编代码的时候发现在phase_6后面有一个secret_phase, 说明这个实验还有一个彩蛋, 那么第一个要做的就是找到secret_phase的入口, 在反汇编程序里搜索secret_phase,可以发现在`phase_defused`里有一个secret_phase的入口
+```assembly
+00000000004015c4 <phase_defused>:
+  4015c4:	48 83 ec 78          	sub    $0x78,%rsp
+  4015c8:	64 48 8b 04 25 28 00 	mov    %fs:0x28,%rax
+  4015cf:	00 00 
+  4015d1:	48 89 44 24 68       	mov    %rax,0x68(%rsp)
+  4015d6:	31 c0                	xor    %eax,%eax
+  4015d8:	83 3d 81 21 20 00 06 	cmpl   $0x6,0x202181(%rip)        # 603760 <num_input_strings>
+  4015df:	75 5e                	jne    40163f <phase_defused+0x7b>
+                                    ----------------------
+  4015e1:	4c 8d 44 24 10       	lea    0x10(%rsp),%r8
+  4015e6:	48 8d 4c 24 0c       	lea    0xc(%rsp),%rcx
+  4015eb:	48 8d 54 24 08       	lea    0x8(%rsp),%rdx
+  4015f0:	be 19 26 40 00       	mov    $0x402619,%esi
+  4015f5:	bf 70 38 60 00       	mov    $0x603870,%edi
+  4015fa:	e8 f1 f5 ff ff       	callq  400bf0 <__isoc99_sscanf@plt>
+  4015ff:	83 f8 03             	cmp    $0x3,%eax
+  401602:	75 31                	jne    401635 <phase_defused+0x71>
+                                    ----------------------
+  401604:	be 22 26 40 00       	mov    $0x402622,%esi
+  401609:	48 8d 7c 24 10       	lea    0x10(%rsp),%rdi
+  40160e:	e8 25 fd ff ff       	callq  401338 <strings_not_equal>
+  401613:	85 c0                	test   %eax,%eax
+  401615:	75 1e                	jne    401635 <phase_defused+0x71>
+                                    ----------------------
+  401617:	bf f8 24 40 00       	mov    $0x4024f8,%edi
+  40161c:	e8 ef f4 ff ff       	callq  400b10 <puts@plt>
+  401621:	bf 20 25 40 00       	mov    $0x402520,%edi
+  401626:	e8 e5 f4 ff ff       	callq  400b10 <puts@plt>
+  40162b:	b8 00 00 00 00       	mov    $0x0,%eax
+  401630:	e8 0d fc ff ff       	callq  401242 <secret_phase>
+```
+按惯例写成伪代码的形式
+```c++
+phase_defused();    // 0x4015c4
+// %rax in a, %rbx in b, %rcx in c, %rdx in d, %rbp in bp
+// %rdi in x, %rsi in y, %rsp in p, %rbp in bp,
+// %r12 in r12, %r13 in r13, %r14 in r14, %rip in rp
+a = 0;   // 0x4015d6
+if(*(rp+0x202181)!=6) return;
+r8 = p + 0x10;
+c = p + 0xc;
+d = p + 0x8;
+y = 0x402619;   // *(0x402619) == the input of phase_4
+x = 0x603870;   // *(0x603870) == %d %d %s
+a = scanf(x, y);    // a is the number of params scanned
+if(a!=3) return;    // 0x4015ff
+y = 0x402622;       // *(0x402622) == DrEvil
+x = p+0x10;         // x is the 3rd input string of phase_4
+a = strings_not_equal(x,y);     // compare x and y, return 1 if not equal
+if(a!=0) return;
+puts(0x4024f8);     // 0x40161c
+puts(0x402520);     // 0x401621
+a = 0;
+call secret_phase();
+```
+分析phase_defused()的伪代码我们发现, 要进入秘密关卡必须满足一个string_not_equal函数, 对比的string存在0x402622, 打印出来是`DrEvil`,再往上追溯的话可以看到有两个引人注意的地址`0x402619`和`0x603870`,
+这两个作为`0x4015fa scanf()`的输入, 第一个打印出来后发现是phase_4的输入, 第二个打印出来是`%d %d %s`表明要检查两个整数和一个字符串, 
+正常情况下phase_4的答案只有2个数字, 但是我们前面发现了phase_4在栈上预留的空间远多于2个int的空间, 说明在phase_4可以多加一个字符串的输入, 并且对应的应该是位于`0x462622`的字符串`DrEvil`, 加上这句后, 我们就愉快地进入了秘密关卡, 下面再来分析这个秘密关;
+```assembly
+0000000000401242 <secret_phase>:
+  401242:	53                   	push   %rbx
+  401243:	e8 56 02 00 00       	callq  40149e <read_line>
+  401248:	ba 0a 00 00 00       	mov    $0xa,%edx
+  40124d:	be 00 00 00 00       	mov    $0x0,%esi
+  401252:	48 89 c7             	mov    %rax,%rdi
+  401255:	e8 76 f9 ff ff       	callq  400bd0 <strtol@plt>
+  40125a:	48 89 c3             	mov    %rax,%rbx
+  40125d:	8d 40 ff             	lea    -0x1(%rax),%eax
+  401260:	3d e8 03 00 00       	cmp    $0x3e8,%eax
+  401265:	76 05                	jbe    40126c <secret_phase+0x2a>
+                                    ---------------------------
+  401267:	e8 ce 01 00 00       	callq  40143a <explode_bomb>
+  40126c:	89 de                	mov    %ebx,%esi
+  40126e:	bf f0 30 60 00       	mov    $0x6030f0,%edi
+  401273:	e8 8c ff ff ff       	callq  401204 <fun7>
+  401278:	83 f8 02             	cmp    $0x2,%eax
+  40127b:	74 05                	je     401282 <secret_phase+0x40>
+                                    ---------------------------
+  40127d:	e8 b8 01 00 00       	callq  40143a <explode_bomb>
+  401282:	bf 38 24 40 00       	mov    $0x402438,%edi
+  401287:	e8 84 f8 ff ff       	callq  400b10 <puts@plt>
+  40128c:	e8 33 03 00 00       	callq  4015c4 <phase_defused>
+                                    ---------------------------
+```
+来到secret_phase, 看到不算长的代码, 总算舒了一口气, 如果再出现phase_6的那个量, 估计至少得干1小时, 标记好跳转指令, 写出伪代码如下:
+```c++
+// %rax in a, %rbx in b, %rcx in c, %rdx in d, %rbp in bp
+// %rdi in x, %rsi in y, %rsp in p, %rbp in bp
+a = readline();
+d = 0xa;
+y = 0;
+x = a;
+a = strtol(x,y);
+b = a;
+a = a - 1;
+if(a>0x3e8) explode bomb;   // 0x401265
+y = b;
+x = 0x6030f0;   // head of a linked list, value=36, next=0x603110
+a = fun7(x,y);  // 0x401273
+if(a!=2) explode bomb;  // 0x40127b
+x = 0x402438;
+puts(x);
+return;
+```
+secret_phase的main部分是比较简单的, 首先判断输入的数不大于0x3e9, 然后调用fun7函数,只有当返回值等于2时才不会引爆炸弹, 所以关键点在于这个fun7;
+```assembly
+0000000000401204 <fun7>:
+  401204:	48 83 ec 08          	sub    $0x8,%rsp
+  401208:	48 85 ff             	test   %rdi,%rdi
+  40120b:	74 2b                	je     401238 <fun7+0x34>
+                                    -------------------------
+  40120d:	8b 17                	mov    (%rdi),%edx
+  40120f:	39 f2                	cmp    %esi,%edx
+  401211:	7e 0d                	jle    401220 <fun7+0x1c>
+                                    -------------------------
+  401213:	48 8b 7f 08          	mov    0x8(%rdi),%rdi
+  401217:	e8 e8 ff ff ff       	callq  401204 <fun7>
+  40121c:	01 c0                	add    %eax,%eax
+  40121e:	eb 1d                	jmp    40123d <fun7+0x39>
+                                    -------------------------
+  401220:	b8 00 00 00 00       	mov    $0x0,%eax
+  401225:	39 f2                	cmp    %esi,%edx
+  401227:	74 14                	je     40123d <fun7+0x39>
+                                    -------------------------
+  401229:	48 8b 7f 10          	mov    0x10(%rdi),%rdi
+  40122d:	e8 d2 ff ff ff       	callq  401204 <fun7>
+  401232:	8d 44 00 01          	lea    0x1(%rax,%rax,1),%eax
+  401236:	eb 05                	jmp    40123d <fun7+0x39>
+                                    -------------------------
+  401238:	b8 ff ff ff ff       	mov    $0xffffffff,%eax
+  40123d:	48 83 c4 08          	add    $0x8,%rsp
+  401241:	c3                   	retq   
+```
+fun7的长度不算长,但是跳转比较多, 所以作为秘密关卡,还是有它的挑战性所在的
+```c++
+fun7(x, y);     // 0x401204, x=0x6030f0, y=b(the input number) 
+// %rax in a, %rbx in b, %rcx in c, %rdx in d, %rbp in bp
+// %rdi in x, %rsi in y, %rsp in p, %rbp in bp
+if(x==0) return -1; // 0x401238
+d = *x;
+if(d>y)
+{
+    x = *(x+8);
+    a = fun7(x, y);
+    a = a * 2;      // 0x40121c
+    return a;
+}
+a = 0;      // 0x401220
+if(d==y) return a;  // 0x401227
+x = *(x+0x10);      // 0x401229
+a = fun7(x,y);
+a = a*2 + 1;        // 0x401232
+return a;
+```
+fun7的核心在于他的几个跳转, 并且要求最后返回值为2, 这里面涉及到递归和链表, 所以显得复杂了一些, 链表的其实在0x6030f0, 因此要把这些链表的value部分和next指向的位置弄明白, 才能得到要求的返回值, 从`0x6030f0`开始一直到`0x603198`有差不多10个数值, 但是我们用不到那么多;
+分析三个分支发现, `*x>y`时返回的是`2*a`是个偶数;
+`*x==y`时, 返回`0`;
+`*x<y`时, 返回`2a+1`是个奇数;
+这么一来我们要得到2的话,首先是a=0, 然后通过2a+1得到1, 然后通过2a返回2, 经历三层递归得到我们要的返回值2, 至此secret_phase就得到了解答, 正确的输入值我这里是`22`
 
